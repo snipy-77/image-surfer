@@ -110,7 +110,11 @@
             #shieldTimerDisplay { font-size: 22px; bottom: 20px; }
         }
     </style>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.6.9/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+
 </head>
 <body>
 
@@ -193,6 +197,7 @@
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 150);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; 
         document.body.appendChild(renderer.domElement);
 
         function updateCameraView() {
@@ -210,7 +215,7 @@
         }
         updateCameraView();
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(0, 20, 10);
@@ -254,12 +259,71 @@
             laneLines.push(lineR);
         }
 
-        // --- Player ---
-        const playerGeo = new THREE.BoxGeometry(1.2, 1, 2);
-        const playerMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f });
-        const player = new THREE.Mesh(playerGeo, playerMat);
+        // --- PLAYER SETUP (FBX MODEL WITH ROOT MOTION FIX) ---
+        
+        const player = new THREE.Group();
         scene.add(player);
 
+        let mixer; 
+        const clock = new THREE.Clock(); 
+        
+        const fbxLoader = new THREE.FBXLoader();
+
+        fbxLoader.load('player.fbx', (object) => {
+            object.scale.set(0.01, 0.01, 0.01); 
+            object.position.set(0, -0.5, 0); 
+            object.rotation.y = Math.PI; 
+            
+            player.add(object);
+
+            if (object.animations && object.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(object);
+
+                const clip = object.animations[0];
+
+                // --- ROOT MOTION FIX ---
+                // Log all track names to console so you can verify which bone is root
+                console.log('Animation tracks found:');
+                clip.tracks.forEach(t => console.log(t.name));
+
+                // Strip position tracks from root/hips bones so the character
+                // runs in-place instead of sliding back and forth
+                clip.tracks = clip.tracks.filter(track => {
+                    const boneName = track.name.split('.')[0].toLowerCase();
+                    const isPositionTrack = track.name.toLowerCase().endsWith('.position');
+
+                    // Covers common root bone naming conventions:
+                    // Mixamo: mixamorigHips
+                    // Generic: root, hips, pelvis, armature
+                    const isRootBone = 
+                        boneName === 'mixamorigHips'.toLowerCase() ||
+                        boneName === 'hips' ||
+                        boneName === 'root' ||
+                        boneName === 'pelvis' ||
+                        boneName === 'armature' ||
+                        boneName.includes('root') ||
+                        boneName.includes('hips');
+
+                    // Keep everything EXCEPT position tracks on the root bone
+                    return !(isRootBone && isPositionTrack);
+                });
+
+                const action = mixer.clipAction(clip);
+                action.play();
+
+            } else {
+                console.warn('No animations found inside player.fbx.');
+            }
+
+        }, undefined, (error) => {
+            console.error('FBX Model could not load, falling back to yellow box.', error);
+            const fallbackGeo = new THREE.BoxGeometry(1.2, 1, 2);
+            const fallbackMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f });
+            const fallbackPlayer = new THREE.Mesh(fallbackGeo, fallbackMat);
+            player.add(fallbackPlayer);
+        });
+
+        // Shield Aura
         const shieldAuraGeo = new THREE.SphereGeometry(1.5, 16, 16);
         const shieldAuraMat = new THREE.MeshPhongMaterial({ 
             color: 0x3498db, 
@@ -273,7 +337,6 @@
 
         // --- INPUTS & CONTROLS ---
 
-        // PC Arrows
         document.addEventListener('keydown', (e) => {
             if (isGameOver) return;
             if (e.key === 'ArrowLeft' && playerLane > 0) {
@@ -288,7 +351,6 @@
             }
         });
 
-        // Mobile Swipe
         let touchStartX = null;
         
         document.addEventListener('touchstart', (e) => { 
@@ -419,12 +481,14 @@
             powerups.push(powerup);
         }
 
+        // --- SHRUNK HITBOX LOGIC FOR OBSTACLES ---
         function checkObstacleCollisions() {
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
                 let distZ = Math.abs(player.position.z - obs.position.z);
                 let distX = Math.abs(player.position.x - obs.position.x);
-                if (distZ < 1.2 && distX < 1.0) return i; 
+                // Tightened bounding box: Z from 1.2 to 0.8, X from 1.0 to 0.7
+                if (distZ < 0.8 && distX < 0.7) return i; 
             }
             return -1;
         }
@@ -445,6 +509,9 @@
         function animate() {
             if (isGameOver) return;
             requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
 
             let currentSpeed = baseSpeed * speedMultiplier;
             let targetX = (playerLane - 1) * laneWidth;
@@ -493,8 +560,8 @@
                 
                 let distZ = Math.abs(player.position.z - coins[i].position.z);
                 let distX = Math.abs(player.position.x - coins[i].position.x);
-                if (distZ < 1.5 && distX < 1.0) {
-                    // Play Coin Sound!
+                // Tightened coin collection box
+                if (distZ < 1.2 && distX < 0.8) {
                     coinSound.currentTime = 0;
                     coinSound.play();
 
@@ -523,8 +590,8 @@
                 
                 let distZ = Math.abs(player.position.z - powerups[i].position.z);
                 let distX = Math.abs(player.position.x - powerups[i].position.x);
-                if (distZ < 1.5 && distX < 1.0) {
-                    // Play Shield Sound!
+                // Tightened shield collection box
+                if (distZ < 1.2 && distX < 0.8) {
                     shieldSound.currentTime = 0;
                     shieldSound.play();
 
