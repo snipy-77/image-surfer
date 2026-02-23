@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -400,7 +400,7 @@
 
         function isSpaceClear(xPos, zPos, safeDistance) {
             for (let i = 0; i < obstacles.length; i++) {
-                if (Math.abs(obstacles[i].position.x - xPos) < 0.5 && Math.abs(obstacles[i].position.z - zPos) < safeDistance) return false; 
+            if (Math.abs(obstacles[i].position.x - xPos) < 1.5 && Math.abs(obstacles[i].position.z - zPos) < safeDistance) return false; 
             }
             for (let i = 0; i < coins.length; i++) {
                 if (Math.abs(coins[i].position.x - xPos) < 0.5 && Math.abs(coins[i].position.z - zPos) < safeDistance) return false; 
@@ -443,7 +443,7 @@
             
             for (let lane of availableLanes) {
                 let xPos = (lane - 1) * laneWidth;
-                if (isSpaceClear(xPos, -120, 10)) {
+                if (isSpaceClear(xPos, -120, 25)) {
                     chosenX = xPos;
                     break;
                 }
@@ -465,7 +465,7 @@
             
             for (let lane of availableLanes) {
                 let xPos = (lane - 1) * laneWidth;
-                if (isSpaceClear(xPos, -120, 15)) {
+                if (isSpaceClear(xPos, -120, 30)) {
                     chosenX = xPos;
                     break;
                 }
