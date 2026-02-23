@@ -152,6 +152,8 @@
         const crashSound = new Audio('end.mp3');
         const swipeLeftSound = new Audio('swipe_left.mp3');
         const swipeRightSound = new Audio('swipe_right.mp3');
+        const coinSound = new Audio('coin.mp3');
+        const shieldSound = new Audio('shield.mp3');
 
         // --- Game State ---
         let playerLane = 1; 
@@ -276,12 +278,12 @@
             if (isGameOver) return;
             if (e.key === 'ArrowLeft' && playerLane > 0) {
                 playerLane--;
-                swipeLeftSound.currentTime = 0; // Rewind sound
+                swipeLeftSound.currentTime = 0; 
                 swipeLeftSound.play();
             }
             if (e.key === 'ArrowRight' && playerLane < 2) {
                 playerLane++;
-                swipeRightSound.currentTime = 0; // Rewind sound
+                swipeRightSound.currentTime = 0; 
                 swipeRightSound.play();
             }
         });
@@ -478,6 +480,7 @@
                 }
             }
 
+            // --- COIN COLLISION CHECK ---
             for (let i = coins.length - 1; i >= 0; i--) {
                 coins[i].position.z += currentSpeed;
                 coins[i].rotation.z += 0.05; 
@@ -491,6 +494,10 @@
                 let distZ = Math.abs(player.position.z - coins[i].position.z);
                 let distX = Math.abs(player.position.x - coins[i].position.x);
                 if (distZ < 1.5 && distX < 1.0) {
+                    // Play Coin Sound!
+                    coinSound.currentTime = 0;
+                    coinSound.play();
+
                     runCoins++;
                     totalCoins++;
                     runCoinsValElement.innerText = runCoins;
@@ -502,6 +509,7 @@
                 }
             }
 
+            // --- POWERUP COLLISION CHECK ---
             for (let i = powerups.length - 1; i >= 0; i--) {
                 powerups[i].position.z += currentSpeed;
                 powerups[i].rotation.y += 0.05; 
@@ -516,6 +524,10 @@
                 let distZ = Math.abs(player.position.z - powerups[i].position.z);
                 let distX = Math.abs(player.position.x - powerups[i].position.x);
                 if (distZ < 1.5 && distX < 1.0) {
+                    // Play Shield Sound!
+                    shieldSound.currentTime = 0;
+                    shieldSound.play();
+
                     activateShield();
                     scene.remove(powerups[i]);
                     powerups.splice(i, 1);
