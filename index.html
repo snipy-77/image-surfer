@@ -190,14 +190,19 @@
 
         function updateCameraView() {
             camera.aspect = window.innerWidth / window.innerHeight;
+            
             if (window.innerWidth < window.innerHeight) {
-                camera.position.set(0, 4.5, 8.5); 
-                camera.fov = 85; 
+                // MOBILE CAMERA SETTINGS
+                camera.position.set(0, 4.2, 4.5); // Moved much closer to the car!
+                camera.fov = 75; 
+                // Looking slightly UP the track pushes the car DOWN on your screen
+                camera.lookAt(0, 2, -10); 
             } else {
+                // PC CAMERA SETTINGS
                 camera.position.set(0, 4, 7);
                 camera.fov = 70;
+                camera.lookAt(0, 1, -10);
             }
-            camera.lookAt(0, 1, -10);
             camera.updateProjectionMatrix();
         }
         updateCameraView();
@@ -342,7 +347,6 @@
         function spawnObstacle() {
             const lane = Math.floor(Math.random() * 3); 
             const xPos = (lane - 1) * laneWidth; 
-            // Changed Z-depth from 1.8 to 0.2 to make it flat!
             const obsGeo = new THREE.BoxGeometry(1.8, 3, 0.2);
             const selectedTexture = Math.random() > 0.5 ? obsTexture1 : obsTexture2;
             const obsMat = new THREE.MeshBasicMaterial({ map: selectedTexture });
@@ -401,7 +405,6 @@
                 let obs = obstacles[i];
                 let distZ = Math.abs(player.position.z - obs.position.z);
                 let distX = Math.abs(player.position.x - obs.position.x);
-                // Shrank distZ threshold from 2.0 to 1.2 to account for thinner obstacles
                 if (distZ < 1.2 && distX < 1.0) return i; 
             }
             return -1;
