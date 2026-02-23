@@ -12,6 +12,7 @@
             background-color: #87CEEB; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #333;
+            /* Critical for mobile: stops browser from trying to scroll or zoom */
             touch-action: none; 
         }
         #ui-layer {
@@ -45,7 +46,7 @@
         }
         #coinDisplay {
             font-size: 18px;
-            color: #f1c40f; /* Gold */
+            color: #f1c40f; 
             margin-top: 5px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
@@ -143,7 +144,6 @@
         const highScoreValElement = document.getElementById('highScoreVal');
         const newHighScoreMsg = document.getElementById('newHighScoreMsg');
         
-        // --- New UI Elements ---
         const runCoinsValElement = document.getElementById('runCoinsVal');
         const totalCoinsValElement = document.getElementById('totalCoinsVal');
         const shieldTimerDisplay = document.getElementById('shieldTimerDisplay');
@@ -158,14 +158,13 @@
         let isGameOver = false;
         let frameCount = 0;
         
-        // Arrays for Game Objects
         let obstacles = [];
         let scenery = [];
         let laneLines = [];
         let coins = [];
         let powerups = [];
 
-        // --- Saved Data (Local Storage) ---
+        // --- Saved Data ---
         let savedHighScore = localStorage.getItem('surferHighScore');
         let highScore = savedHighScore ? parseInt(savedHighScore) : 0;
         highScoreValElement.innerText = highScore;
@@ -254,7 +253,6 @@
         const player = new THREE.Mesh(playerGeo, playerMat);
         scene.add(player);
 
-        // --- Player Shield Aura (Invisible by default) ---
         const shieldAuraGeo = new THREE.SphereGeometry(1.5, 16, 16);
         const shieldAuraMat = new THREE.MeshPhongMaterial({ 
             color: 0x3498db, 
@@ -264,30 +262,62 @@
         });
         const playerShieldAura = new THREE.Mesh(shieldAuraGeo, shieldAuraMat);
         playerShieldAura.visible = false;
-        player.add(playerShieldAura); // Attaches aura directly to the player block
+        player.add(playerShieldAura);
 
-        // --- Inputs ---
+        // --- INPUTS & CONTROLS ---
+
+        // PC Arrows
         document.addEventListener('keydown', (e) => {
             if (isGameOver) return;
             if (e.key === 'ArrowLeft' && playerLane > 0) playerLane--;
             if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
         });
+
+        // Mobile Swipe (Upgraded for instant response)
         let touchStartX = 0;
-        document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: false });
-        document.addEventListener('touchend', (e) => {
-            if (isGameOver) return;
-            let swipeDistance = e.changedTouches[0].screenX - touchStartX;
-            if (swipeDistance < -30 && playerLane > 0) playerLane--;
-            else if (swipeDistance > 30 && playerLane < 2) playerLane++;
+        
+        document.addEventListener('touchstart', (e) => { 
+            touchStartX = e.touches[0].clientX; 
         }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            if (isGameOver) return;
+            // Prevents iOS/Android browser back-swipe gestures from interrupting the game
+            e.preventDefault(); 
+            
+            let touchCurrentX = e.touches[0].clientX;
+            let swipeDistance = touchCurrentX - touchStartX;
+            
+            // Lowered threshold to 25px for immediate snapping
+            if (swipeDistance < -25 && playerLane > 0) {
+                playerLane--;
+                touchStartX = touchCurrentX; // Reset origin so they can continuously swipe left
+            } 
+            else if (swipeDistance > 25 && playerLane < 2) {
+                playerLane++;
+                touchStartX = touchCurrentX; // Reset origin so they can continuously swipe right
+            }
+        }, { passive: false });
+
         restartBtn.addEventListener('click', resetGame);
         restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); resetGame(); });
+        
         window.addEventListener('resize', () => {
             updateCameraView();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
         // --- Game Logic ---
+
+        function isSpaceClear(xPos, zPos, safeDistance) {
+            for (let i = 0; i < obstacles.length; i++) {
+                let obs = obstacles[i];
+                if (Math.abs(obs.position.x - xPos) < 0.5 && Math.abs(obs.position.z - zPos) < safeDistance) {
+                    return false; 
+                }
+            }
+            return true; 
+        }
 
         function spawnTree() {
             const treeGroup = new THREE.Group();
@@ -316,36 +346,49 @@
         }
 
         function spawnCoin() {
-            const lane = Math.floor(Math.random() * 3); 
-            const xPos = (lane - 1) * laneWidth; 
+            let availableLanes = [0, 1, 2].sort(() => Math.random() - 0.5);
+            let chosenX = null;
             
-            // Thin cylinder to look like a coin
+            for (let lane of availableLanes) {
+                let xPos = (lane - 1) * laneWidth;
+                if (isSpaceClear(xPos, -120, 10)) {
+                    chosenX = xPos;
+                    break;
+                }
+            }
+            if (chosenX === null) return; 
+
             const coinGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.15, 16);
-            const coinMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f }); // Gold
+            const coinMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f }); 
             const coin = new THREE.Mesh(coinGeo, coinMat);
-            
-            // Stand the coin upright
             coin.rotation.x = Math.PI / 2;
-            coin.position.set(xPos, 0.8, -120); 
+            coin.position.set(chosenX, 0.8, -120); 
             scene.add(coin);
             coins.push(coin);
         }
 
         function spawnPowerup() {
-            const lane = Math.floor(Math.random() * 3); 
-            const xPos = (lane - 1) * laneWidth; 
+            let availableLanes = [0, 1, 2].sort(() => Math.random() - 0.5);
+            let chosenX = null;
             
-            // Diamond shape for the shield powerup
+            for (let lane of availableLanes) {
+                let xPos = (lane - 1) * laneWidth;
+                if (isSpaceClear(xPos, -120, 15)) {
+                    chosenX = xPos;
+                    break;
+                }
+            }
+            
+            if (chosenX === null) return; 
+
             const powerGeo = new THREE.OctahedronGeometry(0.6);
             const powerMat = new THREE.MeshPhongMaterial({ color: 0x3498db, emissive: 0x2980b9 });
             const powerup = new THREE.Mesh(powerGeo, powerMat);
-            
-            powerup.position.set(xPos, 1, -120); 
+            powerup.position.set(chosenX, 1, -120); 
             scene.add(powerup);
             powerups.push(powerup);
         }
 
-        // Returns the INDEX of the hit obstacle, or -1 if no hit
         function checkObstacleCollisions() {
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
@@ -360,7 +403,6 @@
             hasShield = true;
             playerShieldAura.visible = true;
             shieldTimerDisplay.style.display = 'block';
-            // Set end time to exactly 30 seconds from right now
             shieldEndTime = Date.now() + 30000; 
         }
 
@@ -383,20 +425,16 @@
                 if (line.position.z > 10) line.position.z -= 120; 
             });
 
-            // --- SPAWNERS ---
             frameCount++;
             let obsSpawnRate = Math.max(15, 120 - Math.floor(speedMultiplier * 25));
             if (frameCount % obsSpawnRate === 0) spawnObstacle();
             
             if (frameCount % Math.max(10, obsSpawnRate - 10) === 0) spawnTree(); 
             
-            // Spawn Coins more frequently
-            if (frameCount % 40 === 0 && Math.random() > 0.3) spawnCoin();
+            if (frameCount % 30 === 0) spawnCoin();
 
-            // Spawn Shield Powerup RARELY (10x less likely than obstacles)
-            if (frameCount % (obsSpawnRate * 10) === 0 && Math.random() > 0.5) spawnPowerup();
+            if (frameCount % 900 === 0) spawnPowerup();
 
-            // --- MOVEMENT & CLEANUP ---
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 obstacles[i].position.z += currentSpeed;
                 if (obstacles[i].position.z > 10) {
@@ -412,10 +450,9 @@
                 }
             }
 
-            // Move Coins & Check Collection
             for (let i = coins.length - 1; i >= 0; i--) {
                 coins[i].position.z += currentSpeed;
-                coins[i].rotation.z += 0.05; // Spin animation
+                coins[i].rotation.z += 0.05; 
                 
                 if (coins[i].position.z > 10) {
                     scene.remove(coins[i]);
@@ -426,22 +463,20 @@
                 let distZ = Math.abs(player.position.z - coins[i].position.z);
                 let distX = Math.abs(player.position.x - coins[i].position.x);
                 if (distZ < 1.5 && distX < 1.0) {
-                    // Collect Coin!
                     runCoins++;
                     totalCoins++;
                     runCoinsValElement.innerText = runCoins;
                     totalCoinsValElement.innerText = totalCoins;
-                    localStorage.setItem('surferTotalCoins', totalCoins); // Save immediately
+                    localStorage.setItem('surferTotalCoins', totalCoins); 
                     
                     scene.remove(coins[i]);
                     coins.splice(i, 1);
                 }
             }
 
-            // Move Powerups & Check Collection
             for (let i = powerups.length - 1; i >= 0; i--) {
                 powerups[i].position.z += currentSpeed;
-                powerups[i].rotation.y += 0.05; // Spin animation
+                powerups[i].rotation.y += 0.05; 
                 powerups[i].rotation.x += 0.02; 
                 
                 if (powerups[i].position.z > 10) {
@@ -453,46 +488,39 @@
                 let distZ = Math.abs(player.position.z - powerups[i].position.z);
                 let distX = Math.abs(player.position.x - powerups[i].position.x);
                 if (distZ < 1.5 && distX < 1.0) {
-                    // Collect Powerup!
                     activateShield();
                     scene.remove(powerups[i]);
                     powerups.splice(i, 1);
                 }
             }
 
-            // --- SHIELD TIMER LOGIC ---
             if (hasShield) {
-                // Calculate remaining seconds
                 let timeLeft = Math.ceil((shieldEndTime - Date.now()) / 1000);
                 if (timeLeft <= 0) {
-                    breakShield(); // Time is up!
+                    breakShield(); 
                 } else {
                     shieldTimeValElement.innerText = timeLeft;
                 }
             }
 
-            // --- SCORE & DIFFICULTY ---
             score += 0.1 * speedMultiplier; 
             scoreValElement.innerText = Math.floor(score);
             
             if (score < 1000) speedMultiplier += 0.0006; 
             else speedMultiplier += 0.0001; 
 
-            // --- OBSTACLE COLLISION CHECK ---
             let hitIndex = checkObstacleCollisions();
             
             if (hitIndex !== -1) {
                 if (hasShield) {
-                    // Shield saves you! Break the shield and destroy the obstacle.
                     breakShield();
                     scene.remove(obstacles[hitIndex]);
                     obstacles.splice(hitIndex, 1);
                 } else {
-                    // GAME OVER
                     isGameOver = true;
                     let finalScoreInt = Math.floor(score);
                     finalScoreElement.innerText = finalScoreInt;
-                    finalCoinsElement.innerText = runCoins; // Show coins collected this run
+                    finalCoinsElement.innerText = runCoins; 
                     
                     if (finalScoreInt > highScore) {
                         highScore = finalScoreInt;
@@ -517,12 +545,10 @@
             frameCount = 0; 
             player.position.x = 0;
             
-            // Reset run specific items
             runCoins = 0;
             runCoinsValElement.innerText = runCoins;
-            breakShield(); // Ensure shield resets on a new run
+            breakShield(); 
             
-            // Clear arrays
             obstacles.forEach(obs => scene.remove(obs)); obstacles = [];
             scenery.forEach(tree => scene.remove(tree)); scenery = [];
             coins.forEach(coin => scene.remove(coin)); coins = [];
