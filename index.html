@@ -35,6 +35,14 @@
             font-weight: bold;
             color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+        }
+        /* Style for the High Score under the main score */
+        #highScoreDisplay {
+            font-size: 16px;
+            color: #f1c40f; /* Gold color */
+            margin-top: 5px;
         }
         #gameOverScreen {
             display: none;
@@ -50,6 +58,20 @@
             align-items: center;
             pointer-events: auto; 
             z-index: 10;
+        }
+        /* Style for the "New High Score" announcement */
+        #newHighScoreMsg {
+            display: none;
+            color: #f1c40f;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
         button {
             padding: 12px 30px;
@@ -72,11 +94,15 @@
     <div id="ui-layer">
         <h1>Image Obstacle Surfer</h1>
         <div class="instructions">PC: Left/Right Arrows | Mobile: Swipe</div>
-        <div id="scoreBoard">Score: <span id="scoreVal">0</span></div>
+        <div id="scoreBoard">
+            <div>Score: <span id="scoreVal">0</span></div>
+            <div id="highScoreDisplay">High Score: <span id="highScoreVal">0</span></div>
+        </div>
     </div>
 
     <div id="gameOverScreen">
         <h1>Crash!</h1>
+        <h2 id="newHighScoreMsg">🏆 NEW HIGH SCORE! 🏆</h2>
         <h2>Final Score: <span id="finalScore">0</span></h2>
         <button id="restartBtn">Play Again</button>
     </div>
@@ -87,6 +113,10 @@
         const finalScoreElement = document.getElementById('finalScore');
         const gameOverScreen = document.getElementById('gameOverScreen');
         const restartBtn = document.getElementById('restartBtn');
+        
+        // --- New High Score UI Elements ---
+        const highScoreValElement = document.getElementById('highScoreVal');
+        const newHighScoreMsg = document.getElementById('newHighScoreMsg');
 
         // --- Game State ---
         let playerLane = 1; 
@@ -99,6 +129,11 @@
         let scenery = [];
         let laneLines = [];
         let frameCount = 0;
+
+        // --- Load High Score from Local Storage ---
+        let savedHighScore = localStorage.getItem('surferHighScore');
+        let highScore = savedHighScore ? parseInt(savedHighScore) : 0;
+        highScoreValElement.innerText = highScore;
 
         // --- Three.js Setup ---
         const scene = new THREE.Scene();
@@ -265,14 +300,27 @@
             
             // The Soft Cap Logic
             if (score < 1000) {
-                speedMultiplier += 0.0006; // Standard acceleration
+                speedMultiplier += 0.0006; 
             } else {
-                speedMultiplier += 0.0001; // Acceleration becomes 6x slower!
+                speedMultiplier += 0.0001; 
             }
 
+            // --- GAME OVER & HIGH SCORE CHECK ---
             if (checkCollisions()) {
                 isGameOver = true;
-                finalScoreElement.innerText = Math.floor(score);
+                let finalScoreInt = Math.floor(score);
+                finalScoreElement.innerText = finalScoreInt;
+                
+                // Check if we beat the high score!
+                if (finalScoreInt > highScore) {
+                    highScore = finalScoreInt;
+                    localStorage.setItem('surferHighScore', highScore); // Save it to the browser
+                    highScoreValElement.innerText = highScore; // Update the UI in the top left
+                    newHighScoreMsg.style.display = 'block'; // Show the "NEW HIGH SCORE" banner
+                } else {
+                    newHighScoreMsg.style.display = 'none'; // Hide the banner if we didn't beat it
+                }
+
                 gameOverScreen.style.display = 'flex';
             }
             renderer.render(scene, camera);
