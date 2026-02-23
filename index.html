@@ -150,6 +150,8 @@
 
         // --- Audio Files ---
         const crashSound = new Audio('end.mp3');
+        const swipeLeftSound = new Audio('swipe_left.mp3');
+        const swipeRightSound = new Audio('swipe_right.mp3');
 
         // --- Game State ---
         let playerLane = 1; 
@@ -272,8 +274,16 @@
         // PC Arrows
         document.addEventListener('keydown', (e) => {
             if (isGameOver) return;
-            if (e.key === 'ArrowLeft' && playerLane > 0) playerLane--;
-            if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
+            if (e.key === 'ArrowLeft' && playerLane > 0) {
+                playerLane--;
+                swipeLeftSound.currentTime = 0; // Rewind sound
+                swipeLeftSound.play();
+            }
+            if (e.key === 'ArrowRight' && playerLane < 2) {
+                playerLane++;
+                swipeRightSound.currentTime = 0; // Rewind sound
+                swipeRightSound.play();
+            }
         });
 
         // Mobile Swipe
@@ -293,11 +303,19 @@
             let swipeDistance = touchCurrentX - touchStartX;
             
             if (swipeDistance < -40) {
-                if (playerLane > 0) playerLane--;
+                if (playerLane > 0) {
+                    playerLane--;
+                    swipeLeftSound.currentTime = 0;
+                    swipeLeftSound.play();
+                }
                 touchStartX = null; 
             } 
             else if (swipeDistance > 40) {
-                if (playerLane < 2) playerLane++;
+                if (playerLane < 2) {
+                    playerLane++;
+                    swipeRightSound.currentTime = 0;
+                    swipeRightSound.play();
+                }
                 touchStartX = null; 
             }
         }, { passive: false });
@@ -529,8 +547,7 @@
                 } else {
                     isGameOver = true;
                     
-                    // PLAY THE CRASH SOUND
-                    crashSound.currentTime = 0; // Rewind to start in case it was already playing
+                    crashSound.currentTime = 0; 
                     crashSound.play();
                     
                     let finalScoreInt = Math.floor(score);
