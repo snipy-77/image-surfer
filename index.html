@@ -272,35 +272,38 @@
             if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
         });
 
-        // Mobile Swipe (STRICT: One swipe = One lane)
-        let touchStartX = 0;
-        let hasSwiped = false; // The new lock variable
+        // Mobile Swipe (STRICTEST LOCK: Only one lane change per screen tap)
+        let touchStartX = null;
         
         document.addEventListener('touchstart', (e) => { 
             touchStartX = e.touches[0].clientX; 
-            hasSwiped = false; // Reset the lock when you touch the screen
         }, { passive: false });
 
         document.addEventListener('touchmove', (e) => {
             if (isGameOver) return;
             e.preventDefault(); 
             
-            // If they already successfully changed a lane during this touch, ignore the rest
-            if (hasSwiped) return; 
+            // If touchStartX is null, the control is locked until they lift their finger
+            if (touchStartX === null) return; 
             
             let touchCurrentX = e.touches[0].clientX;
             let swipeDistance = touchCurrentX - touchStartX;
             
-            // Require a solid 30px swipe to trigger
-            if (swipeDistance < -30 && playerLane > 0) {
-                playerLane--;
-                hasSwiped = true; // Lock the controls until they lift their finger
+            // Swipe threshold set to 40px to prevent accidental micro-swipes
+            if (swipeDistance < -40) {
+                if (playerLane > 0) playerLane--;
+                touchStartX = null; // Lock the controls completely
             } 
-            else if (swipeDistance > 30 && playerLane < 2) {
-                playerLane++;
-                hasSwiped = true; // Lock the controls
+            else if (swipeDistance > 40) {
+                if (playerLane < 2) playerLane++;
+                touchStartX = null; // Lock the controls completely
             }
         }, { passive: false });
+
+        // Unlock the controls when they lift their finger
+        document.addEventListener('touchend', (e) => {
+            touchStartX = null;
+        });
 
         restartBtn.addEventListener('click', resetGame);
         restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); resetGame(); });
@@ -313,11 +316,17 @@
         // --- Game Logic ---
 
         function isSpaceClear(xPos, zPos, safeDistance) {
+            // Check against Obstacles
             for (let i = 0; i < obstacles.length; i++) {
-                let obs = obstacles[i];
-                if (Math.abs(obs.position.x - xPos) < 0.5 && Math.abs(obs.position.z - zPos) < safeDistance) {
-                    return false; 
-                }
+                if (Math.abs(obstacles[i].position.x - xPos) < 0.5 && Math.abs(obstacles[i].position.z - zPos) < safeDistance) return false; 
+            }
+            // Check against Coins
+            for (let i = 0; i < coins.length; i++) {
+                if (Math.abs(coins[i].position.x - xPos) < 0.5 && Math.abs(coins[i].position.z - zPos) < safeDistance) return false; 
+            }
+            // Check against Powerups
+            for (let i = 0; i < powerups.length; i++) {
+                if (Math.abs(powerups[i].position.x - xPos) < 0.5 && Math.abs(powerups[i].position.z - zPos) < safeDistance) return false; 
             }
             return true; 
         }
