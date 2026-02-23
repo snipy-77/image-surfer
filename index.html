@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Image Obstacle Surfer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; 
+            background-color: #87CEEB; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            touch-action: none; 
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-top: 15px; margin-bottom: 5px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
+        .instructions { font-size: 14px; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); text-align: center; font-weight: bold; }
+        #scoreBoard {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        #gameOverScreen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto; 
+            z-index: 10;
+        }
+        button {
+            padding: 12px 30px;
+            font-size: 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #2ecc71; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>Image Obstacle Surfer</h1>
+        <div class="instructions">PC: Left/Right Arrows | Mobile: Swipe</div>
+        <div id="scoreBoard">Score: <span id="scoreVal">0</span></div>
+    </div>
+
+    <div id="gameOverScreen">
+        <h1>Crash!</h1>
+        <h2>Final Score: <span id="finalScore">0</span></h2>
+        <button id="restartBtn">Play Again</button>
+    </div>
+
+    <script>
+        // --- UI Elements ---
+        const scoreValElement = document.getElementById('scoreVal');
+        const finalScoreElement = document.getElementById('finalScore');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // --- Game State ---
+        let playerLane = 1; 
+        let laneWidth = 2.5; 
+        let score = 0;
+        let baseSpeed = 0.3; 
+        let speedMultiplier = 1;
+        let isGameOver = false;
+        let obstacles = [];
+        let scenery = [];
+        let laneLines = [];
+        let frameCount = 0;
+
+        // --- Three.js Setup ---
+        const scene = new THREE.Scene();
+        const skyColor = 0x87CEEB; 
+        scene.background = new THREE.Color(skyColor);
+        scene.fog = new THREE.Fog(skyColor, 30, 120); 
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 150);
+        camera.position.set(0, 4, 7); 
+        camera.lookAt(0, 1, -10); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(0, 20, 10);
+        scene.add(dirLight);
+
+        // --- LOAD TEXTURES ---
+        const textureLoader = new THREE.TextureLoader();
+        const obsTexture1 = textureLoader.load('1.jpg');
+        const obsTexture2 = textureLoader.load('2.jpg');
+        obsTexture1.encoding = THREE.sRGBEncoding;
+        obsTexture2.encoding = THREE.sRGBEncoding;
+
+        // --- Environment ---
+        const grassGeo = new THREE.PlaneGeometry(200, 200);
+        const grassMat = new THREE.MeshLambertMaterial({ color: 0x2ecc71 });
+        const grass = new THREE.Mesh(grassGeo, grassMat);
+        grass.rotation.x = -Math.PI / 2;
+        grass.position.y = -0.5;
+        scene.add(grass);
+
+        const roadGeo = new THREE.PlaneGeometry(8.5, 200);
+        const roadMat = new THREE.MeshLambertMaterial({ color: 0x34495e });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.y = -0.49; 
+        scene.add(road);
+
+        const lineGeo = new THREE.PlaneGeometry(0.2, 3);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        for (let i = 0; i < 20; i++) {
+            let zPos = -i * 6; 
+            let lineL = new THREE.Mesh(lineGeo, lineMat);
+            lineL.rotation.x = -Math.PI / 2;
+            lineL.position.set(-1.25, -0.48, zPos);
+            scene.add(lineL);
+            laneLines.push(lineL);
+            let lineR = new THREE.Mesh(lineGeo, lineMat);
+            lineR.rotation.x = -Math.PI / 2;
+            lineR.position.set(1.25, -0.48, zPos);
+            scene.add(lineR);
+            laneLines.push(lineR);
+        }
+
+        // --- Player ---
+        const playerGeo = new THREE.BoxGeometry(1.2, 1, 2);
+        const playerMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f });
+        const player = new THREE.Mesh(playerGeo, playerMat);
+        scene.add(player);
+
+        // --- Inputs ---
+        document.addEventListener('keydown', (e) => {
+            if (isGameOver) return;
+            if (e.key === 'ArrowLeft' && playerLane > 0) playerLane--;
+            if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
+        });
+        let touchStartX = 0;
+        document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: false });
+        document.addEventListener('touchend', (e) => {
+            if (isGameOver) return;
+            let swipeDistance = e.changedTouches[0].screenX - touchStartX;
+            if (swipeDistance < -30 && playerLane > 0) playerLane--;
+            else if (swipeDistance > 30 && playerLane < 2) playerLane++;
+        }, { passive: false });
+        restartBtn.addEventListener('click', resetGame);
+        restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); resetGame(); });
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Game Logic ---
+
+        function spawnTree() {
+            const treeGroup = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2), new THREE.MeshLambertMaterial({ color: 0x5c4033 }));
+            trunk.position.y = 0.5;
+            treeGroup.add(trunk);
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), new THREE.MeshLambertMaterial({ color: 0x27ae60 }));
+            leaves.position.y = 2.5;
+            treeGroup.add(leaves);
+            const side = Math.random() > 0.5 ? 1 : -1;
+            treeGroup.position.set(side * (5 + Math.random() * 8), -0.5, -120); 
+            scene.add(treeGroup);
+            scenery.push(treeGroup);
+        }
+
+        function spawnObstacle() {
+            const lane = Math.floor(Math.random() * 3); 
+            const xPos = (lane - 1) * laneWidth; 
+            const obsGeo = new THREE.BoxGeometry(1.8, 3, 1.8);
+            const selectedTexture = Math.random() > 0.5 ? obsTexture1 : obsTexture2;
+            const obsMat = new THREE.MeshBasicMaterial({ map: selectedTexture });
+            const obs = new THREE.Mesh(obsGeo, obsMat);
+            obs.position.set(xPos, 1.5, -120); 
+            scene.add(obs);
+            obstacles.push(obs);
+        }
+
+        function checkCollisions() {
+            for (let i = 0; i < obstacles.length; i++) {
+                let obs = obstacles[i];
+                let distZ = Math.abs(player.position.z - obs.position.z);
+                let distX = Math.abs(player.position.x - obs.position.x);
+                if (distZ < 2 && distX < 1.0) return true;
+            }
+            return false;
+        }
+
+        function animate() {
+            if (isGameOver) return;
+            requestAnimationFrame(animate);
+
+            let currentSpeed = baseSpeed * speedMultiplier;
+            let targetX = (playerLane - 1) * laneWidth;
+            player.position.x += (targetX - player.position.x) * 0.15; 
+
+            laneLines.forEach(line => {
+                line.position.z += currentSpeed;
+                if (line.position.z > 10) line.position.z -= 120; 
+            });
+
+            frameCount++;
+            let spawnRate = Math.max(15, 120 - Math.floor(speedMultiplier * 25));
+            if (frameCount % spawnRate === 0) spawnObstacle();
+            let treeSpawnRate = Math.max(10, spawnRate - 10);
+            if (frameCount % treeSpawnRate === 0) spawnTree(); 
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].position.z += currentSpeed;
+                if (obstacles[i].position.z > 10) {
+                    scene.remove(obstacles[i]);
+                    obstacles.splice(i, 1);
+                }
+            }
+            for (let i = scenery.length - 1; i >= 0; i--) {
+                scenery[i].position.z += currentSpeed;
+                if (scenery[i].position.z > 15) {
+                    scene.remove(scenery[i]);
+                    scenery.splice(i, 1);
+                }
+            }
+
+            // --- SCORE & DIFFICULTY UPDATE ---
+            score += 0.1 * speedMultiplier; 
+            scoreValElement.innerText = Math.floor(score);
+            
+            // The Soft Cap Logic
+            if (score < 1000) {
+                speedMultiplier += 0.0006; // Standard acceleration
+            } else {
+                speedMultiplier += 0.0001; // Acceleration becomes 6x slower!
+            }
+
+            if (checkCollisions()) {
+                isGameOver = true;
+                finalScoreElement.innerText = Math.floor(score);
+                gameOverScreen.style.display = 'flex';
+            }
+            renderer.render(scene, camera);
+        }
+
+        function resetGame() {
+            isGameOver = false; score = 0; speedMultiplier = 1; playerLane = 1; frameCount = 0; player.position.x = 0;
+            obstacles.forEach(obs => scene.remove(obs)); obstacles = [];
+            scenery.forEach(tree => scene.remove(tree)); scenery = [];
+            gameOverScreen.style.display = 'none'; scoreValElement.innerText = '0';
+            animate();
+        }
+
+        animate();
+    </script>
+</body>
+</html>
