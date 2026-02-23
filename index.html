@@ -38,10 +38,9 @@
             display: flex;
             flex-direction: column;
         }
-        /* Style for the High Score under the main score */
         #highScoreDisplay {
             font-size: 16px;
-            color: #f1c40f; /* Gold color */
+            color: #f1c40f; 
             margin-top: 5px;
         }
         #gameOverScreen {
@@ -59,7 +58,6 @@
             pointer-events: auto; 
             z-index: 10;
         }
-        /* Style for the "New High Score" announcement */
         #newHighScoreMsg {
             display: none;
             color: #f1c40f;
@@ -86,6 +84,15 @@
             transition: background 0.2s;
         }
         button:hover { background-color: #2ecc71; }
+
+        /* --- MOBILE RESPONSIVE UI ADJUSTMENTS --- */
+        @media (max-width: 600px) {
+            h1 { font-size: 24px; margin-top: 10px; }
+            .instructions { font-size: 12px; }
+            #scoreBoard { font-size: 18px; top: 10px; left: 10px; }
+            #highScoreDisplay { font-size: 12px; }
+            #newHighScoreMsg { font-size: 18px; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -113,8 +120,6 @@
         const finalScoreElement = document.getElementById('finalScore');
         const gameOverScreen = document.getElementById('gameOverScreen');
         const restartBtn = document.getElementById('restartBtn');
-        
-        // --- New High Score UI Elements ---
         const highScoreValElement = document.getElementById('highScoreVal');
         const newHighScoreMsg = document.getElementById('newHighScoreMsg');
 
@@ -130,7 +135,7 @@
         let laneLines = [];
         let frameCount = 0;
 
-        // --- Load High Score from Local Storage ---
+        // --- Load High Score ---
         let savedHighScore = localStorage.getItem('surferHighScore');
         let highScore = savedHighScore ? parseInt(savedHighScore) : 0;
         highScoreValElement.innerText = highScore;
@@ -141,13 +146,35 @@
         scene.background = new THREE.Color(skyColor);
         scene.fog = new THREE.Fog(skyColor, 30, 120); 
 
+        // Initial camera setup (will be adjusted immediately by updateCameraView)
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 150);
-        camera.position.set(0, 4, 7); 
-        camera.lookAt(0, 1, -10); 
-
+        
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
+
+        // --- RESPONSIVE CAMERA LOGIC ---
+        function updateCameraView() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            
+            if (window.innerWidth < window.innerHeight) {
+                // Portrait Mode (Mobile)
+                // Pull camera back and up, widen field of view to see outer lanes
+                camera.position.set(0, 6, 12); 
+                camera.fov = 85; 
+            } else {
+                // Landscape Mode (PC)
+                // Keep camera closer
+                camera.position.set(0, 4, 7);
+                camera.fov = 70;
+            }
+            
+            camera.lookAt(0, 1, -10);
+            camera.updateProjectionMatrix();
+        }
+
+        // Call once on load
+        updateCameraView();
 
         // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -216,9 +243,10 @@
         }, { passive: false });
         restartBtn.addEventListener('click', resetGame);
         restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); resetGame(); });
+        
+        // --- Resize Listener ---
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            updateCameraView(); // Adjust camera angles based on new size
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
@@ -298,7 +326,6 @@
             score += 0.1 * speedMultiplier; 
             scoreValElement.innerText = Math.floor(score);
             
-            // The Soft Cap Logic
             if (score < 1000) {
                 speedMultiplier += 0.0006; 
             } else {
@@ -311,14 +338,13 @@
                 let finalScoreInt = Math.floor(score);
                 finalScoreElement.innerText = finalScoreInt;
                 
-                // Check if we beat the high score!
                 if (finalScoreInt > highScore) {
                     highScore = finalScoreInt;
-                    localStorage.setItem('surferHighScore', highScore); // Save it to the browser
-                    highScoreValElement.innerText = highScore; // Update the UI in the top left
-                    newHighScoreMsg.style.display = 'block'; // Show the "NEW HIGH SCORE" banner
+                    localStorage.setItem('surferHighScore', highScore); 
+                    highScoreValElement.innerText = highScore; 
+                    newHighScoreMsg.style.display = 'block'; 
                 } else {
-                    newHighScoreMsg.style.display = 'none'; // Hide the banner if we didn't beat it
+                    newHighScoreMsg.style.display = 'none'; 
                 }
 
                 gameOverScreen.style.display = 'flex';
