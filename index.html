@@ -191,9 +191,11 @@
         function updateCameraView() {
             camera.aspect = window.innerWidth / window.innerHeight;
             if (window.innerWidth < window.innerHeight) {
-                camera.position.set(0, 6, 12); 
+                // MOBILE CAMERA SETTINGS (Moved closer!)
+                camera.position.set(0, 4.5, 8.5); 
                 camera.fov = 85; 
             } else {
+                // PC CAMERA SETTINGS
                 camera.position.set(0, 4, 7);
                 camera.fov = 70;
             }
@@ -283,24 +285,21 @@
             if (isGameOver) return;
             e.preventDefault(); 
             
-            // If touchStartX is null, the control is locked until they lift their finger
             if (touchStartX === null) return; 
             
             let touchCurrentX = e.touches[0].clientX;
             let swipeDistance = touchCurrentX - touchStartX;
             
-            // Swipe threshold set to 40px to prevent accidental micro-swipes
             if (swipeDistance < -40) {
                 if (playerLane > 0) playerLane--;
-                touchStartX = null; // Lock the controls completely
+                touchStartX = null; 
             } 
             else if (swipeDistance > 40) {
                 if (playerLane < 2) playerLane++;
-                touchStartX = null; // Lock the controls completely
+                touchStartX = null; 
             }
         }, { passive: false });
 
-        // Unlock the controls when they lift their finger
         document.addEventListener('touchend', (e) => {
             touchStartX = null;
         });
@@ -316,15 +315,12 @@
         // --- Game Logic ---
 
         function isSpaceClear(xPos, zPos, safeDistance) {
-            // Check against Obstacles
             for (let i = 0; i < obstacles.length; i++) {
                 if (Math.abs(obstacles[i].position.x - xPos) < 0.5 && Math.abs(obstacles[i].position.z - zPos) < safeDistance) return false; 
             }
-            // Check against Coins
             for (let i = 0; i < coins.length; i++) {
                 if (Math.abs(coins[i].position.x - xPos) < 0.5 && Math.abs(coins[i].position.z - zPos) < safeDistance) return false; 
             }
-            // Check against Powerups
             for (let i = 0; i < powerups.length; i++) {
                 if (Math.abs(powerups[i].position.x - xPos) < 0.5 && Math.abs(powerups[i].position.z - zPos) < safeDistance) return false; 
             }
