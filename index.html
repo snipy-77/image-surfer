@@ -190,13 +190,11 @@
 
         function updateCameraView() {
             camera.aspect = window.innerWidth / window.innerHeight;
-            
             if (window.innerWidth < window.innerHeight) {
                 // MOBILE CAMERA SETTINGS
-                camera.position.set(0, 4.2, 4.5); // Moved much closer to the car!
+                camera.position.set(0, 4.5, 6.0); // Pulled back slightly so the car isn't cropped
                 camera.fov = 75; 
-                // Looking slightly UP the track pushes the car DOWN on your screen
-                camera.lookAt(0, 2, -10); 
+                camera.lookAt(0, 1.5, -10); // Tilted down slightly to lift the car up the screen
             } else {
                 // PC CAMERA SETTINGS
                 camera.position.set(0, 4, 7);
@@ -277,7 +275,7 @@
             if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
         });
 
-        // Mobile Swipe (STRICTEST LOCK)
+        // Mobile Swipe
         let touchStartX = null;
         
         document.addEventListener('touchstart', (e) => { 
