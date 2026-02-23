@@ -12,7 +12,6 @@
             background-color: #87CEEB; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #333;
-            /* Critical for mobile: stops browser from trying to scroll or zoom */
             touch-action: none; 
         }
         #ui-layer {
@@ -273,29 +272,33 @@
             if (e.key === 'ArrowRight' && playerLane < 2) playerLane++;
         });
 
-        // Mobile Swipe (Upgraded for instant response)
+        // Mobile Swipe (STRICT: One swipe = One lane)
         let touchStartX = 0;
+        let hasSwiped = false; // The new lock variable
         
         document.addEventListener('touchstart', (e) => { 
             touchStartX = e.touches[0].clientX; 
+            hasSwiped = false; // Reset the lock when you touch the screen
         }, { passive: false });
 
         document.addEventListener('touchmove', (e) => {
             if (isGameOver) return;
-            // Prevents iOS/Android browser back-swipe gestures from interrupting the game
             e.preventDefault(); 
+            
+            // If they already successfully changed a lane during this touch, ignore the rest
+            if (hasSwiped) return; 
             
             let touchCurrentX = e.touches[0].clientX;
             let swipeDistance = touchCurrentX - touchStartX;
             
-            // Lowered threshold to 25px for immediate snapping
-            if (swipeDistance < -25 && playerLane > 0) {
+            // Require a solid 30px swipe to trigger
+            if (swipeDistance < -30 && playerLane > 0) {
                 playerLane--;
-                touchStartX = touchCurrentX; // Reset origin so they can continuously swipe left
+                hasSwiped = true; // Lock the controls until they lift their finger
             } 
-            else if (swipeDistance > 25 && playerLane < 2) {
+            else if (swipeDistance > 30 && playerLane < 2) {
                 playerLane++;
-                touchStartX = touchCurrentX; // Reset origin so they can continuously swipe right
+                hasSwiped = true; // Lock the controls
             }
         }, { passive: false });
 
